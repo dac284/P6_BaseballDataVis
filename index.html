@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>D3 Test</title>
+        <script type="text/javascript" src="js/d3.v3.js"></script>
+        <link rel="stylesheet" type="text/css" href="css/style.css">
+    </head>
+    <body>
+        
+        <script type="text/javascript">
+
+            var data = d3.csv("baseball_data.csv", function(d) {
+                d['HR'] = +d.HR;
+                d['avg'] = +d.avg;
+                d['hand'] = d.handedness;
+                d['name'] = d.name;
+                return d
+            }, draw);
+
+            
+            function draw(data) {
+                "use strict";
+                var margin = 75,
+                  width = 1400 - margin,
+                  height = 600 - margin,
+                  radius = 3,
+                  color = 'blue';
+
+                //Main title
+                d3.select("body")
+                  .append("h1")
+                  .text("Baseball Stats");
+
+                //Brief explanation -change text to tell story
+                d3.select("body")
+                    .append("p")
+                    .attr("class", "desc")
+                    .text("This projects examines some data from a sample of about 1500 baseball players. Below is a scatterplot of their home runs and batting average. The color of the points corresponds to the batter's handedness, with red being right handed, blue left handed, and green a switch hitter. Notice the large proportion pf players who hit for averages between 0.22 and 0.26 and less than 50 home runs. Take a look at the distribution than click the button below when you are ready.");
+
+                // Create button to zoom in on top performers
+                var buttons = d3.select("body")
+                                .append("button")
+                                .attr("class", "btn")
+                                .text("See some of the top performers")
+
+                //Create the svg variable
+                var svg = d3.select('body')
+                            .append('svg')
+                            .attr('width', width + margin)
+                            .attr('height', height + margin)
+                            .append('g')
+                            .attr('class','chart');
+
+                 //Bind the data
+                d3.select('svg')
+                    .selectAll('circle')
+                    .data(data)
+                    .enter()
+                    .append('circle');
+
+                //Scale the variables
+                var HR_extent = d3.extent(data, function(d) {
+                    return d.HR;
+                });
+
+                var avg_extent = d3.extent(data, function(d) {
+                    return d.avg;
+                });
+
+                var HRscale = d3.scale.linear()
+                                        .range([height, margin])
+                                        .domain(HR_extent);
+
+                var avg_scale = d3.scale.linear()
+                                        .range([margin, width])
+                                        .domain(avg_extent);
+
+                //Create axes
+                var HR_axis = d3.svg.axis()
+                                    .scale(HRscale)
+                                    .orient('left');
+
+                var avg_axis = d3.svg.axis()
+                                    .scale(avg_scale);
+
+        
+
+                svg.append('g')
+                    .attr('class', 'x axis')
+                    .attr('transform', "translate(0, " + height + ")")
+                    .call(avg_axis);
+
+                svg.append("text")
+                    .attr("class", "x label")
+                    .attr("x", width/2)
+                    .attr("y", height + 36)
+                    .text("Batting Average");
+
+                svg.append('g')
+                    .attr('class', 'y axis')
+                    .attr('transform', "translate(" + margin + ",0)")
+                    .call(HR_axis);
+
+                svg.append("text")
+                    .attr("class", "y label")
+                    .attr("transform", "rotate(-90)")
+                    .attr("x", -(height+margin)/2)
+                    .attr("y", 25)
+                    .text("Home Runs");
+
+                d3.selectAll('circle')
+                    .attr('cx', function(d) {
+                        return avg_scale(d.avg);
+                    })
+                    .attr('cy', function(d) {
+                        return HRscale(d.HR);
+                    })
+                    .attr('r', radius)
+                    .attr('fill', function(d) {
+                        if (d.hand === 'R') {
+                            return 'red';
+                        } else if (d.hand ==='L') {
+                            return 'blue';
+                        } else {
+                            return 'green';
+                        }
+                    })
+                    // .on("mouseover", function() {
+                    //     d3.select(this)
+                    //         .enter() 
+                    //         .append("text")
+                    //         .text(function(d) {return d.name;}) 
+                    // });;
+
+                // function rescale() {
+                //     console.log("hello");
+                //     HRscale.domain([100,500])
+                //     svg.select("y axis")
+                //             .transition()
+                //             .duration(1500)
+                //             .ease("sin-in-out")
+                //             .call(HR_axis);
+                //             // https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
+                // }        
+
+                
+
+                buttons.on("click", function() {
+                    
+                    HRscale.domain([100, 600]);
+                    svg.select(".y.axis")
+                            .transition()
+                            .duration(1500)
+                            .ease("sin-in-out")
+                            .call(HR_axis);
+
+                    avg_scale.domain([0.200, 0.320]);
+                    svg.select(".x.axis")
+                            .transition()
+                            .duration(1500)
+                            .ease("sin-in-out")
+                            .call(avg_axis);
+                    
+                    d3.selectAll('circle')
+                        .filter(function(d) {return d.HR > 100;})
+                        .filter(function(d) {return d.avg > 0.200;})
+                        .transition()
+                        .duration(1500)
+                        .attr('cx', function(d) {
+                            return avg_scale(d.avg);
+                        })
+                        .attr('cy', function(d) {
+                            return HRscale(d.HR);
+                        })
+                        .style('opacity', 0.8);
+
+                    d3.selectAll('circle')
+                        .filter(function(d) {return d.HR <= 100;})
+                        .remove();
+
+                    d3.selectAll('circle')
+                        .filter(function(d) {return d.avg <= 0.200;})
+                        .remove();
+
+                    // adapted from http://bl.ocks.org/biovisualize/1016860
+
+                    var tooltip = d3.select("body")
+                        .append("div")
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "hidden");
+
+                    d3.selectAll('circle')
+                        .on("mouseover", function(d){return tooltip.style("visibility", "visible").text(function(){return d.name;});})
+                        .on("mousemove", function(){return tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");})
+                        .on("mouseout", function(){return tooltip.style("visibility", "hidden");});
+
+                    d3.select("button").transition()
+                                        .duration(1500)
+                                        .remove();
+
+                    d3.select(".desc").transition()
+                                        .delay(1500)
+                                        .text("Now hover over a point to view the player!");                    
+                })       
+            };
+
+        </script>
+    </body>
+</html>  
