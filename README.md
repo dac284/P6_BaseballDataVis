@@ -1,5 +1,6 @@
 # P6_BaseballDataVis
 Udacity NanoDegree Project 6 - Creating a data visualization for a baseball dataset
+<<<<<<< HEAD
 
 ### Summary
 
@@ -20,3 +21,5 @@ easy way to view the names of some of the best players.
 No feedback yet.
 
 ### Resources
+=======
+>>>>>>> d054aa2bbea44c747aa09aa5ff33d188354a463e
