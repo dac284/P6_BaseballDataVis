@@ -15,6 +15,8 @@
                 d['avg'] = +d.avg;
                 d['hand'] = d.handedness;
                 d['name'] = d.name;
+                d['height'] = +d.height;
+                d['weight'] = +d.weight;
                 return d
             }, draw);
 
@@ -36,16 +38,18 @@
                 d3.select("body")
                     .append("p")
                     .attr("class", "desc")
-                    .text("This projects examines some data from a sample of about 1500 baseball players. Below is a scatterplot of their home runs and batting average. The color of the points corresponds to the batter's handedness, with red being right handed, blue left handed, and green a switch hitter. Notice the large proportion pf players who hit for averages between 0.22 and 0.26 and less than 50 home runs. Take a look at the distribution than click the button below when you are ready.");
+                    .text("This projects examines some data from a sample of about 1500 baseball players. Below is a scatterplot of their home runs and batting average. Notice the slight trend that increaseing batting average correlates with more home runs. However, there are a large proportion pf players who hit for averages between 0.22 and 0.26 and less than 50 home runs, which is pretty poor in baseball terms. Take a look at the distribution than click the button below when you are ready to move on.");
 
                 // Create button to zoom in on top performers
                 var buttons = d3.select("body")
+                                .append("div")
                                 .append("button")
                                 .attr("class", "btn")
-                                .text("See some of the top performers")
+                                .text("See the top performers");
 
                 //Create the svg variable
                 var svg = d3.select('body')
+                            .append("div")
                             .append('svg')
                             .attr('width', width + margin)
                             .attr('height', height + margin)
@@ -125,26 +129,50 @@
                         } else {
                             return 'green';
                         }
-                    })
-                    // .on("mouseover", function() {
-                    //     d3.select(this)
-                    //         .enter() 
-                    //         .append("text")
-                    //         .text(function(d) {return d.name;}) 
-                    // });;
-
-                // function rescale() {
-                //     console.log("hello");
-                //     HRscale.domain([100,500])
-                //     svg.select("y axis")
-                //             .transition()
-                //             .duration(1500)
-                //             .ease("sin-in-out")
-                //             .call(HR_axis);
-                //             // https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
-                // }        
-
+                    });
                 
+                // Legend - adapted from http://stackoverflow.com/questions/13573771/adding-a-chart-legend-in-d3 
+                var legend = svg.append("g")
+                                  .attr("class", "legend")
+                                  .attr("x", 130)
+                                  .attr("y", 75)
+                                  .attr("height", 100)
+                                  .attr("width", 100);
+
+                legend.append("rect")
+                      .attr("x", 130)
+                      .attr("y", 75)
+                      .attr("width", 10)
+                      .attr("height", 10)
+                      .style("fill", "green");
+                legend.append("text")
+                      .attr("x", 145)
+                      .attr("y", 85)
+                      .text("Switch Hitter");
+                legend.append("rect")
+                      .attr("x", 130)
+                      .attr("y", 100)
+                      .attr("width", 10)
+                      .attr("height", 10)
+                      .style("fill", "blue");
+                legend.append("text")
+                      .attr("x", 145)
+                      .attr("y", 110)
+                      .text("Left Handed");
+                legend.append("rect")
+                      .attr("x", 130)
+                      .attr("y", 125)
+                      .attr("width", 10)
+                      .attr("height", 10)
+                      .style("fill", "red")
+                legend.append("text")
+                      .attr("x", 145)
+                      .attr("y", 135)
+                      .text("Right Handed");
+
+
+                // https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
+                //       
 
                 buttons.on("click", function() {
                     
@@ -192,7 +220,12 @@
                         .style("visibility", "hidden");
 
                     d3.selectAll('circle')
-                        .on("mouseover", function(d){return tooltip.style("visibility", "visible").text(function(){return d.name;});})
+                        .on("mouseover", function(d){
+                            return tooltip.style("visibility", "visible")
+                            .text(function(){ 
+                                return d.name;
+                            });
+                        })
                         .on("mousemove", function(){return tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");})
                         .on("mouseout", function(){return tooltip.style("visibility", "hidden");});
 
@@ -202,7 +235,7 @@
 
                     d3.select(".desc").transition()
                                         .delay(1500)
-                                        .text("Now hover over a point to view the player!");                    
+                                        .text("Viewing only the top performers (especially concerning home runs) changes the story quite a bit! Now there looks like no relation between batting average and home runs. Hover over a point to view the player's name!");                    
                 })       
             };
 
