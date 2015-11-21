@@ -13,10 +13,7 @@
             var data = d3.csv("baseball_data.csv", function(d) {
                 d['HR'] = +d.HR;
                 d['avg'] = +d.avg;
-                d['hand'] = d.handedness;
                 d['name'] = d.name;
-                d['height'] = +d.height;
-                d['weight'] = +d.weight;
                 return d
             }, draw);
 
@@ -38,7 +35,7 @@
                 d3.select("body")
                     .append("p")
                     .attr("class", "desc")
-                    .text("This projects examines some data from a sample of about 1500 baseball players. Below is a scatterplot of their home runs and batting average. Notice the slight trend that increaseing batting average correlates with more home runs. However, there are a large proportion pf players who hit for averages between 0.22 and 0.26 and less than 50 home runs, which is pretty poor in baseball terms. Take a look at the distribution than click the button below when you are ready to move on.");
+                    .text("This projects examines some data from a sample of about 1500 baseball players. Below is a scatterplot of their home runs and batting average. Notice the trendline showing the least squares regression between batting average and home runs. The r squared value is about 0.16, meaning batting average explains about 16% of the variation in home runs. However, there are a large proportion of players who hit for averages between 0.22 and 0.26 and less than 50 home runs, which is pretty poor in baseball terms. Take a look at the distribution than click the button below when you are ready to move on.");
 
                 // Create button to zoom in on top performers
                 var buttons = d3.select("body")
@@ -55,6 +52,9 @@
                             .attr('height', height + margin)
                             .append('g')
                             .attr('class','chart');
+
+                // filter out 'batters' with no hits (avg=0)
+                data = data.filter(function(d) {return d.avg > 0.01;});
 
                  //Bind the data
                 d3.select('svg')
@@ -80,15 +80,13 @@
                                         .range([margin, width])
                                         .domain(avg_extent);
 
-                //Create axes
+                //Create axes and axes labels
                 var HR_axis = d3.svg.axis()
                                     .scale(HRscale)
                                     .orient('left');
 
                 var avg_axis = d3.svg.axis()
                                     .scale(avg_scale);
-
-        
 
                 svg.append('g')
                     .attr('class', 'x axis')
@@ -113,6 +111,7 @@
                     .attr("y", 25)
                     .text("Home Runs");
 
+                // Create points on scatterplot
                 d3.selectAll('circle')
                     .attr('cx', function(d) {
                         return avg_scale(d.avg);
@@ -121,77 +120,91 @@
                         return HRscale(d.HR);
                     })
                     .attr('r', radius)
-                    .attr('fill', function(d) {
-                        if (d.hand === 'R') {
-                            return 'red';
-                        } else if (d.hand ==='L') {
-                            return 'blue';
-                        } else {
-                            return 'green';
-                        }
-                    });
-                
-                // Legend - adapted from http://stackoverflow.com/questions/13573771/adding-a-chart-legend-in-d3 
-                var legend = svg.append("g")
-                                  .attr("class", "legend")
-                                  .attr("x", 130)
-                                  .attr("y", 75)
-                                  .attr("height", 100)
-                                  .attr("width", 100);
+                    .attr('fill', color)
+                    .style('opacity', 0.3);
 
-                legend.append("rect")
-                      .attr("x", 130)
-                      .attr("y", 75)
-                      .attr("width", 10)
-                      .attr("height", 10)
-                      .style("fill", "green");
-                legend.append("text")
-                      .attr("x", 145)
-                      .attr("y", 85)
-                      .text("Switch Hitter");
-                legend.append("rect")
-                      .attr("x", 130)
-                      .attr("y", 100)
-                      .attr("width", 10)
-                      .attr("height", 10)
-                      .style("fill", "blue");
-                legend.append("text")
-                      .attr("x", 145)
-                      .attr("y", 110)
-                      .text("Left Handed");
-                legend.append("rect")
-                      .attr("x", 130)
-                      .attr("y", 125)
-                      .attr("width", 10)
-                      .attr("height", 10)
-                      .style("fill", "red")
-                legend.append("text")
-                      .attr("x", 145)
-                      .attr("y", 135)
-                      .text("Right Handed");
+                // Least squares regression
+                // adapted from http://bl.ocks.org/benvandyke/8459843 //
+                var xSeries = data.map(function (d) { return d.avg; });
+                var ySeries = data.map(function (d) { return d.HR; });
+                var leastSquaresCoeff = leastSquares(xSeries, ySeries);
 
+                // apply the reults of the least squares regression to form a line
+                var x1 = -leastSquaresCoeff[1]/leastSquaresCoeff[0];
+                var y1 = 0;
+                var x2 = d3.max(xSeries);
+                var y2 = leastSquaresCoeff[0] * x2 + leastSquaresCoeff[1];
+                var trendData = [[x1,y1,x2,y2]];
 
-                // https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
+                var trendline = svg.selectAll(".trendline")
+                    .data(trendData);
+
+                trendline.enter()
+                    .append("line")
+                    .attr("class", "trendline")
+                    .attr("x1", function(d) { return avg_scale(d[0]); })
+                    .attr("y1", function(d) { return HRscale(d[1]); })
+                    .attr("x2", function(d) { return avg_scale(d[2]); })
+                    .attr("y2", function(d) { return HRscale(d[3]); })
+                    .attr("stroke", "black")
+                    .attr("stroke-width", 2);
+
+                //display r2
+                    svg.append("text")
+                        .text("r-squared: " + d3.round(leastSquaresCoeff[2],4))
+                        .attr("class", "text-label")
+                        .attr("x", function(d) {return avg_scale(x2) - 60;})
+                        .attr("y", function(d) {return HRscale(y2) - 10;});
+
+                // returns slope, intercept and r-square of the line
+                // Function is from http://bl.ocks.org/benvandyke/8459843 //
+                function leastSquares(xSeries, ySeries) {
+                    var reduceSumFunc = function(prev, cur) { return prev + cur; };
+                    
+                    var xBar = xSeries.reduce(reduceSumFunc) * 1.0 / xSeries.length;
+                    var yBar = ySeries.reduce(reduceSumFunc) * 1.0 / ySeries.length;
+
+                    var ssXX = xSeries.map(function(d) { return Math.pow(d - xBar, 2); })
+                        .reduce(reduceSumFunc);
+                    
+                    var ssYY = ySeries.map(function(d) { return Math.pow(d - yBar, 2); })
+                        .reduce(reduceSumFunc);
+                        
+                    var ssXY = xSeries.map(function(d, i) { return (d - xBar) * (ySeries[i] - yBar); })
+                        .reduce(reduceSumFunc);
+                        
+                    var slope = ssXY / ssXX;
+                    var intercept = yBar - (xBar * slope);
+                    var rSquare = Math.pow(ssXY, 2) / (ssXX * ssYY);
+                    
+                    return [slope, intercept, rSquare];
+                }
+
+                // Adapted from https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
                 //       
+                // Add transition to zoom in to top performers when button is clicked
 
                 buttons.on("click", function() {
-                    
-                    HRscale.domain([100, 600]);
+
+                    // rescale HR scale
+                    HRscale.domain([50, 600]);
                     svg.select(".y.axis")
                             .transition()
                             .duration(1500)
                             .ease("sin-in-out")
                             .call(HR_axis);
 
-                    avg_scale.domain([0.200, 0.320]);
+                    //rescale avg svale
+                    avg_scale.domain([0.200, 0.330]);
                     svg.select(".x.axis")
                             .transition()
                             .duration(1500)
                             .ease("sin-in-out")
                             .call(avg_axis);
-                    
+
+                    // rescale points
                     d3.selectAll('circle')
-                        .filter(function(d) {return d.HR > 100;})
+                        .filter(function(d) {return d.HR > 50;})
                         .filter(function(d) {return d.avg > 0.200;})
                         .transition()
                         .duration(1500)
@@ -201,10 +214,43 @@
                         .attr('cy', function(d) {
                             return HRscale(d.HR);
                         })
-                        .style('opacity', 0.8);
+                        .style('opacity', 0.4);
 
+                    // filter poor performers and redo regression
+                    data = data.filter(function(d) {return d.avg > 0.2;});
+                    data = data.filter(function(d) {return d.HR > 50;});
+
+                    var xSeries = data.map(function (d) { return d.avg; });
+                    var ySeries = data.map(function (d) { return d.HR; });
+                    var leastSquaresCoeff = leastSquares(xSeries, ySeries);
+
+                    // apply the reults of the least squares regression to form a line
+                    var x1 = d3.min(xSeries);
+                    var y1 = leastSquaresCoeff[0] * x1 + leastSquaresCoeff[1];
+                    var x2 = d3.max(xSeries);
+                    var y2 = leastSquaresCoeff[0] * x2 + leastSquaresCoeff[1];
+                    var trendData = [[x1,y1,x2,y2]];
+                    var trendline = svg.selectAll(".trendline")
+                        .data(trendData);
+
+                    trendline.transition()
+                        .duration(1500)
+                        .attr("x1", function(d) { return avg_scale(d[0]); })
+                        .attr("y1", function(d) { return HRscale(d[1]); })
+                        .attr("x2", function(d) { return avg_scale(d[2]); })
+                        .attr("y2", function(d) { return HRscale(d[3]); });
+
+                    //display r2 and remove old r2
+                    svg.append("text")
+                        .text("r-squared: " + d3.round(leastSquaresCoeff[2],4))
+                        .attr("class", "text-label")
+                        .attr("x", function(d) {return avg_scale(x2) - 60;})
+                        .attr("y", function(d) {return HRscale(y2) - 10;});
+                    svg.select(".text-label").remove();
+
+                    //filter out poor performers
                     d3.selectAll('circle')
-                        .filter(function(d) {return d.HR <= 100;})
+                        .filter(function(d) {return d.HR <= 50;})
                         .remove();
 
                     d3.selectAll('circle')
@@ -212,7 +258,7 @@
                         .remove();
 
                     // adapted from http://bl.ocks.org/biovisualize/1016860
-
+                    // add mouseover functionality displaying batter's name
                     var tooltip = d3.select("body")
                         .append("div")
                         .style("position", "absolute")
@@ -229,13 +275,15 @@
                         .on("mousemove", function(){return tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");})
                         .on("mouseout", function(){return tooltip.style("visibility", "hidden");});
 
+                    //remove button after transition
                     d3.select("button").transition()
                                         .duration(1500)
                                         .remove();
 
+                    //change text after transition
                     d3.select(".desc").transition()
                                         .delay(1500)
-                                        .text("Viewing only the top performers (especially concerning home runs) changes the story quite a bit! Now there looks like no relation between batting average and home runs. Hover over a point to view the player's name!");                    
+                                        .text("Now we've zoomed in on the top performers (players with over 50 home runs and above 0.200 batting average). This changes the story quite a bit, as the r squared value went down to 0.064! This means the variation in batting average explains less of the variation in home runs for top performers (compared to all performers). There is still some relation, but it is weak. This is interesting because it suggests power hitters are not necessarily getting more hits, just more big hits. In fact, many big hitters also have high strike out rates, which lowers their average. Hover over a point to view the player's name!");                    
                 })       
             };
 
